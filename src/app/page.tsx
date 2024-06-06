@@ -8,7 +8,9 @@ import { ChangeEvent, FormEvent, useState } from "react";
 import { readStreamableValue } from "ai/rsc";
 import { useChat } from "ai/react";
 import { ChatRequestOptions, Message } from "ai";
-
+import { AnimatePresence, m } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 const demoMessages: Message[] = [
   {
     content: "Hello",
@@ -53,41 +55,53 @@ function ChatInput(props: {
 }
 
 export default function ChatPage() {
-  const { messages, input, handleInputChange, handleSubmit, error } = useChat({
+  let { input, handleInputChange, handleSubmit, error, isLoading } = useChat({
     api: "/api/completion-stream-data",
   });
 
-  if (messages.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen w-screen font-sans">
-        <div className=" flex-1 w-full flex items-center justify-center flex-col ">
-          <div className="flex items-center justify-center gap-8 ">
-            <img
-              src="/ipcc-ai.png"
-              className="w-[72px] h-[72px] animate-custom-spin"
-            />
-            <div className="font-outfit text-5xl font-bold text-[#052F4D]">
-              <span>IPCC</span> <span>AI</span>
-            </div>
-          </div>
-          <div className="flex items-center justify-center gap-8 flex-col">
-            <ChatComponent />
-          </div>
-        </div>
-        <div className="h-[100px] max-w-2xl w-full">
-          <ChatInput
-            input={input}
-            handleInputChange={handleInputChange}
-            handleSubmit={handleSubmit}
-          />
-        </div>
-      </div>
-    );
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  function toggleMessage() {
+    if (messages.length === 0) {
+      setMessages(demoMessages);
+    } else {
+      setMessages([]);
+    }
   }
+
+  const variants = {
+    show: { top: "auto" },
+    hide: { top: "2rem" },
+  };
   return (
-    <div className="flex flex-col items-center justify-center h-screen w-screen font-sans">
-      <div className="w-full flex items-center justify-center flex-col pt-16">
-        <div className="flex items-center justify-center gap-8 ">
+    <div className="flex flex-col items-center justify-center h-screen w-screen font-sans relative">
+      <motion.div
+        // className={cn(
+        //   "w-full flex items-center justify-center flex-col   absolute transition-all top-auto"
+        // )}
+        initial="show"
+        animate={messages.length == 0 ? "show" : "hide"}
+        variants={variants}
+        transition={{ duration: 0.5 }}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+          // backgroundColor: "#f4f4f4",
+          // top: "0",
+          // left: "0",
+          // right: "0",
+          // bottom: "0",
+          position: "absolute",
+          zIndex: "10",
+        }}
+      >
+        <button
+          onClick={toggleMessage}
+          className="flex items-center justify-center gap-8 "
+        >
           <img
             src="/ipcc-ai.png"
             className="w-[72px] h-[72px] animate-custom-spin"
@@ -95,15 +109,37 @@ export default function ChatPage() {
           <div className="font-outfit text-5xl font-bold text-[#052F4D]">
             <span>IPCC</span> <span>AI</span>
           </div>
-        </div>
-      </div>
-      <div className="flex-1 flex items-center justify-start w-full gap-8 flex-col pt-16">
+        </button>
+
+        <AnimatePresence>
+          {messages.length == 0 && (
+            <motion.div
+              // from opacity 0 to 100 in 1.5 seconds
+              initial={{ opacity: 1 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5 }}
+              exit={{ opacity: 0 }}
+              className="flex items-center justify-center gap-8 flex-col"
+            >
+              <ChatComponent />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+      <motion.div
+        //appears in 1.5 seconds
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.5 }}
+        exit={{ opacity: 0 }}
+        className="flex-1 flex items-center justify-start w-full gap-8 flex-col pt-32"
+      >
         <div className="w-full max-w-2xl">
           <div className="max-w-2xl w-full">
             <ChatMessages messages={messages} />
           </div>
         </div>
-      </div>
+      </motion.div>
       <div className="h-[100px] max-w-2xl w-full">
         <ChatInput
           input={input}
