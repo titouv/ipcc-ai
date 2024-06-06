@@ -9,9 +9,16 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^0.0.18",
+    "@langchain/core": "^0.2.5",
+    "@langchain/openai": "^0.1.1",
+    "@langchain/pinecone": "^0.0.7",
+    "@pinecone-database/pinecone": "^2.2.2",
+    "ai": "^3.1.22",
+    "lucide-react": "^0.383.0",
+    "next": "15.0.0-rc.0",
     "react": "19.0.0-rc-f994737d14-20240522",
-    "react-dom": "19.0.0-rc-f994737d14-20240522",
-    "next": "15.0.0-rc.0"
+    "react-dom": "19.0.0-rc-f994737d14-20240522"
   },
   "devDependencies": {
     "typescript": "^5",

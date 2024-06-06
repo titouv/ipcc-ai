@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import defaultTheme from "tailwindcss/defaultTheme";
 
 const config: Config = {
   content: [
@@ -13,8 +14,12 @@ const config: Config = {
         foreground: "var(--foreground)",
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)"],
-        mono: ["var(--font-geist-mono)"],
+        sans: ["var(--font-inter)", ...defaultTheme.fontFamily.sans],
+        outfit: ["var(--font-outfit)", ...defaultTheme.fontFamily.sans],
+      },
+      // add animation for a 1 second spin not repeating
+      animation: {
+        "custom-spin": "spin 1s ease-in-out ",
       },
     },
   },
