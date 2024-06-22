@@ -40,7 +40,7 @@ export async function queryFigure(query: string, numberOfResults = 1) {
       },
     }
   );
-  console.log(results);
+  // console.log(results);
   const formattedResults = results
     .filter((result) => result[1] > CONFIDENCE_THRESHOLD)
     .map((result) => ({ ...result[0], confidence: result[1] }));

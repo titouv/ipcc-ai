@@ -1,9 +1,18 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatGroq } from "@langchain/groq";
 import { pull } from "langchain/hub";
-import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { createStuffDocumentsChain } from "langchain/chains/combine_documents";
 import { StringOutputParser } from "@langchain/core/output_parsers";
+import {
+  ChatPromptTemplate,
+  MessagesPlaceholder,
+} from "@langchain/core/prompts";
+
+import {
+  RunnablePassthrough,
+  RunnableSequence,
+} from "@langchain/core/runnables";
+import { formatDocumentsAsString } from "langchain/util/document";
 
 import { LangChainAdapter, StreamData, StreamingTextResponse } from "ai";
 import { queryFigure } from "../../../../query";
@@ -17,6 +26,7 @@ import {
   AIMessage,
 } from "@langchain/core/messages";
 import { vectorStore } from "../../../../pinecone";
+import { ragChain } from "./chain";
 
 export type ExternalDataType = {
   messageIndex: number;
@@ -79,9 +89,11 @@ export async function POST(req: Request) {
       return new AIMessage(message.content);
     }
   });
-  console.log(formattedMessages);
-
-  const stream = await model.stream(formattedMessages);
+  const stream = await ragChain.stream({
+    question: messages[messages.length - 1].content,
+    chat_history: formattedMessages,
+  });
+  // const stream = await model.stream(formattedMessages);
   const data = new StreamData();
   if (figure) {
     const promise = new Promise<void>(async (resolve) => {

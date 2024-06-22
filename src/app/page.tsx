@@ -193,15 +193,15 @@ function ChatMessages(props: { messages: Message[]; isLoading: boolean }) {
                     props.isLoading && "animate-spin"
                   )}
                 />
-                <div className="flex flex-col gap-2 w-full ">
+                <div className="flex flex-col gap-2 w-full">
                   {image && (
                     <img
                       src={image}
-                      className="border-2 border-[#DEF0FF]  rounded-md p-2"
+                      className="border-2 border-[#DEF0FF]  rounded-md p-2  mt-2"
                     />
                   )}
                   <div
-                    className="text-[15px] prose prose-sm pt-2"
+                    className="text-[15px] prose prose-sm "
                     dangerouslySetInnerHTML={{ __html: markdown }}
                   />
                 </div>
