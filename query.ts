@@ -28,17 +28,26 @@ const vectorStore = await PineconeStore.fromExistingIndex(
   ]
 */
 
-export async function queryFigures(
-  query: string,
-  scoreThreshold = 0.5,
-  numberOfResults = 1
-) {
+const CONFIDENCE_THRESHOLD = 0.8;
+
+export async function queryFigure(query: string, numberOfResults = 1) {
   const results = await vectorStore.similaritySearchWithScore(
     query,
-    numberOfResults
+    numberOfResults,
+    {
+      type: {
+        $eq: "figure",
+      },
+    }
   );
   console.log(results);
-  return results
-    .filter((result) => result[1] > scoreThreshold)
-    .map((result) => result[0]);
+  const formattedResults = results
+    .filter((result) => result[1] > CONFIDENCE_THRESHOLD)
+    .map((result) => ({ ...result[0], confidence: result[1] }));
+
+  if (formattedResults.length === 0) {
+    return undefined;
+  }
+  const result = formattedResults[0];
+  return result;
 }

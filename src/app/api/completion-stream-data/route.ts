@@ -1,6 +1,12 @@
 import { ChatOpenAI } from "@langchain/openai";
+import { ChatGroq } from "@langchain/groq";
+import { pull } from "langchain/hub";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { createStuffDocumentsChain } from "langchain/chains/combine_documents";
+import { StringOutputParser } from "@langchain/core/output_parsers";
+
 import { LangChainAdapter, StreamData, StreamingTextResponse } from "ai";
-import { queryFigures } from "../../../../query";
+import { queryFigure } from "../../../../query";
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -10,6 +16,7 @@ import {
   HumanMessage,
   AIMessage,
 } from "@langchain/core/messages";
+import { vectorStore } from "../../../../pinecone";
 
 export type ExternalDataType = {
   messageIndex: number;
@@ -17,29 +24,49 @@ export type ExternalDataType = {
   image: string;
   title: string;
   url: string;
+  confidence: number;
 };
+
+const SYSTEM_PROMPT = `
+You are an AI assistant specialized in climate science, specifically based on IPCC reports. Answer users' questions accurately and clearly, using information from these reports. Do not answer questions outside this topic.
+Guidelines:
+	1.	Accuracy: Ensure all responses are based on the information from IPCC reports.
+	2.	Clarity: Explain complex scientific terms in a way that is understandable to a general audience.
+	3.	Neutrality: Maintain a neutral tone and present information objectively.
+	4.	Conciseness: Be concise but thorough in your explanations.
+  5.  Use list and bold to make it more readable.
+  5.  The response must be in less than 100 words.
+`.trim();
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function POST(req: Request) {
   const { messages: receivedMessages } = await req.json();
-  const figures = await queryFigures(
+  // await sleep(1000 * 30);
+  console.log(receivedMessages);
+  const figure = await queryFigure(
     receivedMessages[receivedMessages.length - 1].content
   );
-
   const messages = [
     {
       role: "system",
-      content:
-        "You are a helpful assistant from the IPCC that answers questions about the IPCC reports. When a user ask a question you will have the description of the most link image as context, your answer must use this description to answer the question. You MUST mention the image",
+      content: figure
+        ? SYSTEM_PROMPT +
+          "\n When a user ask a question you will have the description of the most link image as context, your answer must use this description to answer the question. You MUST mention the image"
+        : SYSTEM_PROMPT,
     },
     ...receivedMessages,
-    {
-      role: "assistant",
-      content:
-        `Image description is the following\n\n:` + figures[0].pageContent,
-    },
   ];
-
-  const model = new ChatOpenAI({
-    model: "gpt-3.5-turbo-0125",
+  if (figure) {
+    messages.push({
+      role: "assistant",
+      content: `Image description is the following\n\n:` + figure.pageContent,
+    });
+  }
+  const model = new ChatGroq({
+    model: "llama3-70b-8192",
     temperature: 0,
   });
 
@@ -56,24 +83,24 @@ export async function POST(req: Request) {
 
   const stream = await model.stream(formattedMessages);
   const data = new StreamData();
-
-  const promise = new Promise<void>(async (resolve) => {
-    for (const figure of figures) {
+  if (figure) {
+    const promise = new Promise<void>(async (resolve) => {
       const externalData: ExternalDataType = {
         messageIndex: messages.length,
         content: figure.pageContent,
         title: figure.metadata.title,
         url: figure.metadata.url,
         image: figure.metadata.image,
+        confidence: figure.confidence,
       };
       data.appendMessageAnnotation(externalData);
-    }
-    resolve();
-  });
+      resolve();
+    });
+    await promise;
+  }
 
   const aiStream = LangChainAdapter.toAIStream(stream, {
     async onFinal() {
-      await promise;
       data.close();
     },
   });
