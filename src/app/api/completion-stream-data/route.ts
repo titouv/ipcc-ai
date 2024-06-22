@@ -112,7 +112,16 @@ export async function POST(req: Request) {
   }
 
   const aiStream = LangChainAdapter.toAIStream(stream, {
-    async onFinal() {
+    async onFinal(completion) {
+      const generatedRecommendations = ["Why is the earth temprature rising?"];
+
+      //sleep
+      await new Promise((resolve) => setTimeout(resolve, 1000 * 5));
+
+      data.appendMessageAnnotation({
+        generatedRecommendations,
+      });
+
       data.close();
     },
   });

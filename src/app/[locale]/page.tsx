@@ -13,11 +13,11 @@ import {
   ThermometerSnowflake,
   ThermometerSun,
 } from "lucide-react";
-import { ChangeEvent, FormEvent, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { readStreamableValue } from "ai/rsc";
 import { useChat } from "ai/react";
 import { ChatRequestOptions, CreateMessage, Message } from "ai";
-import { AnimatePresence, m } from "framer-motion";
+import { AnimatePresence, m, useAnimation } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { ExternalDataType } from "./api/completion-stream-data/route";
@@ -76,6 +76,7 @@ export default function ChatPage() {
   } = useChat({
     api: "/api/completion-stream-data",
   });
+  const t = useI18n();
 
   //   const [messages, setMessages] = useState<Message[]>([]);
   // V
@@ -86,6 +87,22 @@ export default function ChatPage() {
   //       setMessages([]);
   //     }
   //   }
+
+  const lastMessageAnnotation = messages[messages.length - 1]?.annotations;
+
+  const { showTopShadow, showBottomShadow, scrollContainerRef, handleScroll } =
+    useScrollShadow();
+
+  const controlsTop = useAnimation();
+  const controlsBottom = useAnimation();
+
+  useEffect(() => {
+    controlsTop.start({ opacity: showTopShadow ? 1 : 0 });
+  }, [showTopShadow, controlsTop]);
+
+  useEffect(() => {
+    controlsBottom.start({ opacity: showBottomShadow ? 1 : 0 });
+  }, [showBottomShadow, controlsBottom]);
 
   return (
     <div className="flex flex-col items-center justify-center h-screen w-screen font-sans relative">
@@ -105,20 +122,27 @@ export default function ChatPage() {
           flexDirection: "column",
           position: "absolute",
           zIndex: "10",
+          // backgroundColor: "red",
         }}
       >
-        <button
+        <motion.div
           // onClick={toggleMessage}
+          animate={messages.length == 0 ? "show" : "hide"}
+          variants={{
+            show: { scale: 1 },
+            hide: { scale: 0.5 },
+          }}
+          transition={{ duration: 0.5 }}
           className="flex items-center justify-center gap-8 "
         >
-          <img
+          <motion.img
             src="/ipcc-ai.png"
             className="w-[72px] h-[72px] animate-custom-spin"
           />
           <div className="font-outfit text-5xl font-bold text-[#052F4D]">
-            <span>IPCC</span> <span>AI</span>
+            <span>{t("ipcc")}</span> <span>AI</span>
           </div>
-        </button>
+        </motion.div>
 
         <AnimatePresence>
           {messages.length == 0 && (
@@ -135,20 +159,36 @@ export default function ChatPage() {
           )}
         </AnimatePresence>
       </motion.div>
+
       <motion.div
         //appears in 1.5 seconds
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.5 }}
         exit={{ opacity: 0 }}
-        className="flex-1 flex items-center justify-start w-full gap-8 flex-col mt-32 overflow-y-auto"
+        className="flex-1 flex items-center justify-start w-full gap-8 flex-col mt-32 relative overflow-y-auto"
+        onScroll={handleScroll}
+        ref={scrollContainerRef}
       >
         <div className="w-full max-w-2xl">
           <div className="max-w-2xl w-full">
+            {/* <pre>{JSON.stringify(lastMessageAnnotation, null, 2)}</pre> */}
             <ChatMessages messages={messages} isLoading={isLoading} />
           </div>
         </div>
       </motion.div>
+      <motion.div
+        className="absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-white z-100 to-white/0 mt-32 pointer-events-none touch-none"
+        initial={{ opacity: 0 }}
+        animate={controlsTop}
+        transition={{ duration: 0.2 }}
+      />
+      <motion.div
+        className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-white z-100 mb-24 to-white/0 pointer-events-none touch-none"
+        initial={{ opacity: 0 }}
+        animate={controlsBottom}
+        transition={{ duration: 0.2 }}
+      />
       <div className="h-[100px] max-w-2xl w-full">
         <ChatInput
           input={input}
@@ -161,12 +201,15 @@ export default function ChatPage() {
 }
 
 import showdown from "showdown";
+import { useI18n, useScopedI18n } from "@/locales/client";
+import { ScrollableContent } from "./test/page";
+import useScrollShadow from "@/hooks/test";
 
 function ChatMessages(props: { messages: Message[]; isLoading: boolean }) {
   // side by side messages
   const lastMessageRole = props.messages[props.messages.length - 1]?.role;
   return (
-    <div className="flex flex-col gap-10 w-full pb-20">
+    <div className="flex flex-col gap-10 w-full pb-20 relative">
       {props.messages.map((message, index) => {
         const annotations = message.annotations as
           | ExternalDataType[]
@@ -197,11 +240,11 @@ function ChatMessages(props: { messages: Message[]; isLoading: boolean }) {
                   {image && (
                     <img
                       src={image}
-                      className="border-2 border-[#DEF0FF]  rounded-md p-2  mt-2"
+                      className="border-2 border-zinc-100  rounded-md p-2  mt-2"
                     />
                   )}
                   <div
-                    className="text-[15px] prose prose-sm "
+                    className="text-[15px] prose prose-sm prose-strong:before:bg-blue-500"
                     dangerouslySetInnerHTML={{ __html: markdown }}
                   />
                 </div>

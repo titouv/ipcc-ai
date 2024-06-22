@@ -1,3 +1,21 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* .prose {
+  strong {
+    @apply relative inline-block text-white;
+  }
+  strong:before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -5px;
+
+    width: calc(100% + 10px);
+    height: 100%;
+    @apply bg-[#1989EC] text-white;
+
+    z-index: -1;
+  }
+} */
