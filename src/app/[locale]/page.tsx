@@ -106,6 +106,7 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col items-center justify-center h-screen w-screen font-sans relative">
+      {/* <div className="absolute bg-gradient-to-t from-[#7FCBF5]/40 to-[#7FCBF5]/0 bottom-0  left-0 right-0 h-20 -z-10"></div> */}
       <motion.div
         initial="show"
         animate={messages.length == 0 ? "show" : "hide"}
@@ -133,13 +134,13 @@ export default function ChatPage() {
             hide: { scale: 0.5 },
           }}
           transition={{ duration: 0.5 }}
-          className="flex items-center justify-center gap-8 "
+          className="flex items-center justify-center gap-8 relative"
         >
           <motion.img
             src="/ipcc-ai.png"
-            className="w-[72px] h-[72px] animate-custom-spin"
+            className="w-[72px] h-[72px] animate-custom-spin z-50"
           />
-          <div className="font-outfit text-5xl font-bold text-[#052F4D]">
+          <div className="font-outfit text-5xl font-bold text-[#052F4D] z-50">
             <span>{t("ipcc")}</span> <span>AI</span>
           </div>
         </motion.div>
@@ -201,7 +202,7 @@ export default function ChatPage() {
 }
 
 import showdown from "showdown";
-import { useI18n, useScopedI18n } from "@/locales/client";
+import { useCurrentLocale, useI18n, useScopedI18n } from "@/locales/client";
 import { ScrollableContent } from "./test/page";
 import useScrollShadow from "@/hooks/test";
 
@@ -277,21 +278,27 @@ function ChatComponent(props: {
     chatRequestOptions?: ChatRequestOptions | undefined
   ) => Promise<string | null | undefined>;
 }) {
+  const locale = useCurrentLocale();
   const recommandations = [
     {
-      title: "Why is the earth temprature rising?",
+      titleEn: "Why is the earth temperature rising?",
+      titleFr: "Pourquoi la température de la terre augmente-t-elle?",
       icon: ThermometerSun,
     },
     {
-      title: "What are some natural causes of climate change?",
+      titleEn: "What are some natural causes of climate change?",
+      titleFr: "Quelles sont les causes naturelles du changement climatique?",
       icon: Shrub,
     },
     {
-      title: "How does climate change affect biodiversity?",
+      titleEn: "How does climate change affect biodiversity?",
+      titleFr: "Comment le changement climatique affecte-t-il la biodiversité?",
       icon: Bird,
     },
     {
-      title: "What's the role of government in climate change?",
+      titleEn: "What's the role of government in climate change?",
+      titleFr:
+        "Quel est le rôle du gouvernement dans le changement climatique?",
       icon: LandmarkIcon,
     },
   ];
@@ -305,7 +312,10 @@ function ChatComponent(props: {
             onClick={() =>
               props.append({
                 role: "user",
-                content: recommendation.title,
+                content:
+                  locale === "en"
+                    ? recommendation.titleEn
+                    : recommendation.titleFr,
               })
             }
             className="relative flex w-40 flex-col gap-2 rounded-2xl border border-token-border-light px-3 pb-4 pt-3 text-start align-top text-[15px] shadow-[0_0_2px_0_rgba(0,0,0,0.05),0_4px_6px_0_rgba(0,0,0,0.02)] transition hover:bg-token-main-surface-secondary"
@@ -314,7 +324,9 @@ function ChatComponent(props: {
               <recommendation.icon className="w-[20px] h-[20px]" />
             )}
             <div className="line-clamp-3 text-balance text-gray-600 dark:text-gray-500 break-word">
-              {recommendation.title}
+              {locale === "en"
+                ? recommendation.titleEn
+                : recommendation.titleFr}
             </div>
           </button>
         ))}

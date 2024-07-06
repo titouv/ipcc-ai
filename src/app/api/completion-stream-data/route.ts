@@ -27,6 +27,7 @@ import {
 } from "@langchain/core/messages";
 import { vectorStore } from "../../../../pinecone";
 import { ragChain } from "./chain";
+import { getCurrentLocale } from "@/locales/server";
 
 export type ExternalDataType = {
   messageIndex: number;
@@ -53,19 +54,46 @@ function sleep(ms: number) {
 }
 
 export async function POST(req: Request) {
+  const locale = getCurrentLocale();
+  console.log("locale", locale);
+
   const { messages: receivedMessages } = await req.json();
   // await sleep(1000 * 30);
   console.log(receivedMessages);
-  const figure = await queryFigure(
-    receivedMessages[receivedMessages.length - 1].content
-  );
+
+  const model = new ChatGroq({
+    model: "llama3-70b-8192",
+    temperature: 0,
+  });
+
+  let lastMessageContent: string =
+    receivedMessages[receivedMessages.length - 1].content;
+  if (locale === "fr") {
+    lastMessageContent = (await model
+      .invoke([
+        new SystemMessage(
+          "Translate the following text into English, answer only with the translation"
+        ),
+        new HumanMessage(receivedMessages[receivedMessages.length - 1].content),
+      ])
+      .then((res) => res.content)) as string;
+  }
+  // throw new Error("test");
+
+  const figure = await queryFigure(lastMessageContent);
   const messages = [
     {
       role: "system",
-      content: figure
-        ? SYSTEM_PROMPT +
-          "\n When a user ask a question you will have the description of the most link image as context, your answer must use this description to answer the question. You MUST mention the image"
-        : SYSTEM_PROMPT,
+      content:
+        (figure
+          ? SYSTEM_PROMPT +
+            "\n When a user ask a question you will have the description of the most link image as context, your answer must use this description to answer the question. You MUST mention the image"
+          : SYSTEM_PROMPT) +
+          "\n\n" +
+          locale ===
+        "en"
+          ? "Answer in English"
+          : "Réponse en français",
     },
     ...receivedMessages,
   ];
@@ -75,10 +103,6 @@ export async function POST(req: Request) {
       content: `Image description is the following\n\n:` + figure.pageContent,
     });
   }
-  const model = new ChatGroq({
-    model: "llama3-70b-8192",
-    temperature: 0,
-  });
 
   const formattedMessages = messages.map((message: any) => {
     if (message.role === "user") {

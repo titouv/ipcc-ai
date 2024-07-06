@@ -9,6 +9,8 @@ import {
 } from "@langchain/core/prompts";
 
 import {
+  Runnable,
+  RunnableConfig,
   RunnableLike,
   RunnablePassthrough,
   RunnableSequence,
@@ -23,6 +25,7 @@ const prompt = await pull<ChatPromptTemplate>("rlm/rag-prompt");
 const llm = new ChatGroq({
   model: "llama3-70b-8192",
   temperature: 0,
+  verbose: true,
 });
 
 const contextualizeQSystemPrompt = `Given a chat history and the latest user question
@@ -54,7 +57,7 @@ const qaPrompt = ChatPromptTemplate.fromMessages([
 ]);
 
 const contextualizedQuestion = (input: Record<string, unknown>) => {
-  console.log("input.question", input.question);
+  // console.log("input.question", input.question);
   return contextualizeQChain;
 };
 
@@ -62,6 +65,7 @@ const retriever = vectorStore.asRetriever({
   metadata: {
     type: "pdf",
   },
+  k: 1, // TODO: change to 5
 });
 
 export const ragChain = RunnableSequence.from([
@@ -76,10 +80,10 @@ export const ragChain = RunnableSequence.from([
         function formatDocumentsAsStringWrapper(
           documents: DocumentInterface<Record<string, any>>[]
         ) {
-          console.log(
-            "documents",
-            documents.map((doc) => doc.pageContent).join("\n\n\n\n\n")
-          );
+          // console.log(
+          //   "documents",
+          //   documents.map((doc) => doc.pageContent).join("\n\n\n\n\n")
+          // );
           return formatDocumentsAsString(documents);
         }
         const value = chain
