@@ -13,8 +13,15 @@ import {
   RunnableSequence,
 } from "@langchain/core/runnables";
 import { formatDocumentsAsString } from "langchain/util/document";
+const cb1 = literalClient.instrumentation.langchain.literalCallback();
 
-import { LangChainAdapter, StreamData, StreamingTextResponse } from "ai";
+import {
+  AIStream,
+  LangChainAdapter,
+  StreamData,
+  StreamingTextResponse,
+  createStreamDataTransformer,
+} from "ai";
 import { queryFigure } from "../../../../query";
 
 // Allow streaming responses up to 30 seconds
@@ -24,10 +31,12 @@ import {
   SystemMessage,
   HumanMessage,
   AIMessage,
+  AIMessageChunk,
 } from "@langchain/core/messages";
 import { vectorStore } from "../../../../pinecone";
-import { ragChain } from "./chain";
+import { ragChain } from "./new";
 import { getCurrentLocale } from "@/locales/server";
+import { literalClient } from "@/lib/literalai";
 
 export type ExternalDataType = {
   messageIndex: number;
@@ -66,43 +75,9 @@ export async function POST(req: Request) {
     temperature: 0,
   });
 
-  let lastMessageContent: string =
+  const lastMessageContent: string =
     receivedMessages[receivedMessages.length - 1].content;
-  if (locale === "fr") {
-    lastMessageContent = (await model
-      .invoke([
-        new SystemMessage(
-          "Translate the following text into English, answer only with the translation"
-        ),
-        new HumanMessage(receivedMessages[receivedMessages.length - 1].content),
-      ])
-      .then((res) => res.content)) as string;
-  }
-  // throw new Error("test");
-
-  const figure = await queryFigure(lastMessageContent);
-  const messages = [
-    {
-      role: "system",
-      content:
-        (figure
-          ? SYSTEM_PROMPT +
-            "\n When a user ask a question you will have the description of the most link image as context, your answer must use this description to answer the question. You MUST mention the image"
-          : SYSTEM_PROMPT) +
-          "\n\n" +
-          locale ===
-        "en"
-          ? "Answer in English"
-          : "Réponse en français",
-    },
-    ...receivedMessages,
-  ];
-  if (figure) {
-    messages.push({
-      role: "assistant",
-      content: `Image description is the following\n\n:` + figure.pageContent,
-    });
-  }
+  const messages = [...receivedMessages];
 
   const formattedMessages = messages.map((message: any) => {
     if (message.role === "user") {
@@ -113,34 +88,48 @@ export async function POST(req: Request) {
       return new AIMessage(message.content);
     }
   });
-  const stream = await ragChain.stream({
-    question: messages[messages.length - 1].content,
-    chat_history: formattedMessages,
-  });
-  // const stream = await model.stream(formattedMessages);
-  const data = new StreamData();
-  if (figure) {
-    const promise = new Promise<void>(async (resolve) => {
-      const externalData: ExternalDataType = {
-        messageIndex: messages.length,
-        content: figure.pageContent,
-        title: figure.metadata.title,
-        url: figure.metadata.url,
-        image: figure.metadata.image,
-        confidence: figure.confidence,
-      };
-      data.appendMessageAnnotation(externalData);
-      resolve();
-    });
-    await promise;
+
+  // console.log(res);
+  // throw new Error("stop");
+
+  const stream = await ragChain.stream(
+    {
+      input: lastMessageContent,
+      chat_history: formattedMessages.slice(0, messages.length - 1),
+    },
+    {
+      callbacks: [cb1],
+    }
+  );
+  console.log(stream);
+
+  function transformStreamToTextOnly(
+    inputStream: typeof stream
+  ): ReadableStream<AIMessageChunk> {
+    return inputStream.pipeThrough(
+      new TransformStream<{ answer: string }, AIMessageChunk>({
+        transform(chunk, controller) {
+          if ("answer" in chunk) {
+            controller.enqueue(new AIMessageChunk({ content: chunk.answer }));
+          } else {
+            console.log("skipping chunk", chunk);
+          }
+        },
+      })
+    );
   }
 
-  const aiStream = LangChainAdapter.toAIStream(stream, {
+  console.log("befor new stream");
+  const newStream: ReadableStream<AIMessageChunk> =
+    transformStreamToTextOnly(stream);
+
+  const data = new StreamData();
+  const aiStream = LangChainAdapter.toAIStream(newStream, {
     async onFinal(completion) {
       const generatedRecommendations = ["Why is the earth temprature rising?"];
 
       //sleep
-      await new Promise((resolve) => setTimeout(resolve, 1000 * 5));
+      // await new Promise((resolve) => setTimeout(resolve, 1000 * 5));
 
       data.appendMessageAnnotation({
         generatedRecommendations,
@@ -149,6 +138,7 @@ export async function POST(req: Request) {
       data.close();
     },
   });
+  console.log("after ai stream");
 
   return new StreamingTextResponse(aiStream, {}, data);
 }

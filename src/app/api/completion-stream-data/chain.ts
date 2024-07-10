@@ -1,16 +1,11 @@
-import { ChatOpenAI } from "@langchain/openai";
 import { ChatGroq } from "@langchain/groq";
 import { pull } from "langchain/hub";
-import { createStuffDocumentsChain } from "langchain/chains/combine_documents";
-import { StringOutputParser } from "@langchain/core/output_parsers";
 import {
   ChatPromptTemplate,
   MessagesPlaceholder,
 } from "@langchain/core/prompts";
 
 import {
-  Runnable,
-  RunnableConfig,
   RunnableLike,
   RunnablePassthrough,
   RunnableSequence,
@@ -18,30 +13,14 @@ import {
 import { formatDocumentsAsString } from "langchain/util/document";
 import { vectorStore } from "../../../../pinecone";
 import { DocumentInterface } from "@langchain/core/documents";
-
-const prompt = await pull<ChatPromptTemplate>("rlm/rag-prompt");
+import { contextualizeQChain } from "./contextualize-qchain";
 
 // const llm = new ChatOpenAI({ model: "gpt-3.5-turbo", temperature: 0 });
 const llm = new ChatGroq({
   model: "llama3-70b-8192",
   temperature: 0,
-  verbose: true,
+  // verbose: true,
 });
-
-const contextualizeQSystemPrompt = `Given a chat history and the latest user question
-which might reference context in the chat history, formulate a standalone question
-  which can be understood without the chat history. Do NOT answer the question,
-  just reformulate it if needed and otherwise return it as is.`;
-
-const contextualizeQPrompt = ChatPromptTemplate.fromMessages([
-  ["system", contextualizeQSystemPrompt],
-  new MessagesPlaceholder("chat_history"),
-  ["human", "{question}"],
-]);
-
-const contextualizeQChain = contextualizeQPrompt
-  .pipe(llm)
-  .pipe(new StringOutputParser());
 
 const qaSystemPrompt = `You are an assistant for question-answering tasks.
 Use the following pieces of retrieved context to answer the question.
@@ -53,12 +32,16 @@ Use the following pieces of retrieved context to answer the question.
 const qaPrompt = ChatPromptTemplate.fromMessages([
   ["system", qaSystemPrompt],
   new MessagesPlaceholder("chat_history"),
-  ["human", "{question}"],
+  ["human", "QA:{question}"],
 ]);
 
-const contextualizedQuestion = (input: Record<string, unknown>) => {
-  // console.log("input.question", input.question);
-  return contextualizeQChain;
+const contextualizedQuestion = (input: Record<string, any>) => {
+  if ("chat_history" in input && input.chat_history.length > 0) {
+    console.log("RUNNING CHAT HISTORY");
+    return contextualizeQChain;
+  }
+  console.log("RUNNING QUESTION");
+  return input.question;
 };
 
 const retriever = vectorStore.asRetriever({
@@ -68,30 +51,27 @@ const retriever = vectorStore.asRetriever({
   k: 1, // TODO: change to 5
 });
 
-export const ragChain = RunnableSequence.from([
+export const ragChain2 = RunnableSequence.from([
   RunnablePassthrough.assign({
-    context: (input: Record<string, unknown>) => {
-      if ("chat_history" in input) {
-        const chain = contextualizedQuestion(input);
-        const retrieverAs = retriever as RunnableLike<
-          string,
-          DocumentInterface<Record<string, any>>[]
-        >;
-        function formatDocumentsAsStringWrapper(
-          documents: DocumentInterface<Record<string, any>>[]
-        ) {
-          // console.log(
-          //   "documents",
-          //   documents.map((doc) => doc.pageContent).join("\n\n\n\n\n")
-          // );
-          return formatDocumentsAsString(documents);
-        }
-        const value = chain
-          .pipe(retrieverAs)
-          .pipe(formatDocumentsAsStringWrapper);
-        return value;
+    context: (input: Record<string, any>) => {
+      const chain = contextualizedQuestion(input);
+      const retrieverAs = retriever as RunnableLike<
+        string,
+        DocumentInterface<Record<string, any>>[]
+      >;
+      function formatDocumentsAsStringWrapper(
+        documents: DocumentInterface<Record<string, any>>[]
+      ) {
+        console.log(
+          "documents",
+          documents.map((doc) => doc.pageContent).join("\n\n\n\n\n")
+        );
+        return formatDocumentsAsString(documents);
       }
-      return "";
+      const value = chain
+        .pipe(retrieverAs)
+        .pipe(formatDocumentsAsStringWrapper);
+      return value;
     },
   }),
   qaPrompt,
